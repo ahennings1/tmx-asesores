@@ -178,7 +178,7 @@ window.dash=(function(){
     <div class="tx-podio" id="podio" data-source="tickets"></div>
     <div class="tx-card" id="card-ranking" style="margin-bottom:var(--cds-gap-md)">
       <div class="tx-row"><div><h3>Ranking de asesores</h3><p class="tx-note">Score 0–100 = promedio de 6 KPIs normalizados (participación vs cuota justa, ticket vs su tienda, UPT, margen, ticket más alto, tendencia 14 días). Clic en un asesor para ver su ficha.</p>
-      <p class="tx-note tx-rnote">Renovación: 🏅 Planilla directa TMX = top 3 o score ≥ 60 sin caída fuerte · ✅ Renovación asegurada = cumple · ⚠️ Evaluar renovación = 3+ semanas seguidas vendiendo bajo su cuota justa (menos del 90%) con score bajo 50, o tercio inferior con 2+ semanas abajo. Oculto en vista equipo.</p></div>
+      <p class="tx-note tx-rnote">Renovación: 🏅 Planilla directa TMX = top 3 o score ≥ 60 sin caída fuerte · ⚠️ Evaluar renovación = su peso en la tienda viene cayendo 3+ semanas seguidas (cada semana menor que la anterior, sin contar la semana en curso) · ✅ Renovación asegurada = todos los demás. Oculto en vista equipo.</p></div>
       <input class="tx-in tx-search" type="search" placeholder="Buscar asesor o tienda" aria-label="Buscar"></div>
       <p class="tx-note tx-eqnote" hidden>👥 Vista equipo: se ocultan los montos en soles (venta, ticket promedio, margen, repartido). Quedan posiciones, % de su tienda, ticket vs tienda, ticket más alto y score, listo para compartir con los asesores.</p>
       <div class="tx-tbl" data-source="tickets"><table id="tbl-ranking"><thead></thead><tbody></tbody></table></div>
@@ -431,17 +431,17 @@ window.dash=(function(){
     const wks = [...new Set(tk.map((d) => wkOf(d.fecha)))].sort();
     const stW = d3.rollup(tk, (v) => d3.sum(v, (d) => d.venta), (d) => d.tienda, (d) => wkOf(d.fecha));
     const asW = d3.rollup(tk, (v) => d3.sum(v, (d) => d.venta), (d) => d.tienda + '|' + d.asesor, (d) => wkOf(d.fecha));
+    const lastWk = wks[wks.length - 1];
+    const wksFull = lastWk && maxF < iso(d3.utcDay.offset(pd(lastWk), 6)) ? wks.slice(0, -1) : wks;
     for (const d of L) {
       const n = (ROSTER[d.tienda] || []).length || 1, sw = stW.get(d.tienda), aw = asW.get(d.key);
-      const seq = wks.filter((w) => sw && (sw.get(w) || 0) > 0).map((w) => ((aw && aw.get(w)) || 0) / sw.get(w) * n);
-      let bajo = 0; for (let i = seq.length - 1; i >= 0 && seq[i] < 0.9; i--) bajo++;
-      let alto = 0; for (let i = seq.length - 1; i >= 0 && seq[i] >= 1; i--) alto++;
-      d.seq = seq; d.rachaBaja = bajo; d.rachaAlta = alto;
-      const tercio = d.pos > (L.length * 2) / 3;
-      if (bajo >= 3 && d.score < 50) { d.renovN = 3; d.renov = '⚠️ Evaluar renovación'; d.renovWhy = `${bajo} semanas seguidas bajo su cuota`; }
-      else if (d.pos <= 3 || (d.score >= 60 && (d.tend == null || d.tend > -0.15))) { d.renovN = 1; d.renov = '🏅 Planilla directa TMX'; d.renovWhy = `Top ${d.pos} · score ${f0(d.score)}${alto ? ` · ${alto} sem. arriba` : ''}`; }
-      else if (tercio && bajo >= 2) { d.renovN = 3; d.renov = '⚠️ Evaluar renovación'; d.renovWhy = `Tercio inferior · ${bajo} sem. seguidas abajo`; }
-      else { d.renovN = 2; d.renov = '✅ Renovación asegurada'; d.renovWhy = bajo ? `Cumple · ojo: ${bajo} sem. abajo` : `Cumple · score ${f0(d.score)}`; }
+      const seq = wksFull.filter((w) => sw && (sw.get(w) || 0) > 0).map((w) => ((aw && aw.get(w)) || 0) / sw.get(w) * n);
+      let caidas = 0; for (let i = seq.length - 1; i > 0 && seq[i] < seq[i - 1]; i--) caidas++;
+      let subidas = 0; for (let i = seq.length - 1; i > 0 && seq[i] > seq[i - 1]; i--) subidas++;
+      d.seq = seq; d.caidas = caidas; d.subidas = subidas;
+      if (d.pos > 3 && caidas >= 3) { d.renovN = 3; d.renov = '⚠️ Evaluar renovación'; d.renovWhy = `${caidas} semanas seguidas cayendo en su tienda`; }
+      else if (d.pos <= 3 || (d.score >= 60 && (d.tend == null || d.tend > -0.15))) { d.renovN = 1; d.renov = '🏅 Planilla directa TMX'; d.renovWhy = `Top ${d.pos} · score ${f0(d.score)}${subidas ? ` · ${subidas} sem. subiendo` : ''}`; }
+      else { d.renovN = 2; d.renov = '✅ Renovación asegurada'; d.renovWhy = caidas === 2 ? 'Cumple · ojo: 2 sem. seguidas cayendo' : subidas ? `Cumple · ${subidas} sem. subiendo` : 'Cumple · estable'; }
     }
     const all = { venta: d3.sum(tk, (d) => d.venta), tickets: d3.sum(tk, (d) => d.es_ticket), vtk: d3.sum(tk.filter((d) => d.es_ticket), (d) => d.venta), und: d3.sum(tk.filter((d) => d.es_ticket), (d) => d.und), vs: d3.sum(tk, (d) => d.venta_sin), mg: d3.sum(tk, (d) => d.margen) };
     all.tp = all.tickets ? all.vtk / all.tickets : null; all.upt = all.tickets ? all.und / all.tickets : null; all.margen = all.vs ? all.mg / all.vs : null;
