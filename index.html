@@ -443,6 +443,7 @@ window.dash=(function(){
       else if (d.pos <= 3 || (d.score >= 60 && (d.tend == null || d.tend > -0.15))) { d.renovN = 1; d.renov = '🏅 Planilla directa TMX'; d.renovWhy = `Top ${d.pos} · score ${f0(d.score)}${subidas ? ` · ${subidas} sem. subiendo` : ''}`; }
       else { d.renovN = 2; d.renov = '✅ Renovación asegurada'; d.renovWhy = caidas === 2 ? 'Cumple · ojo: 2 sem. seguidas cayendo' : subidas ? `Cumple · ${subidas} sem. subiendo` : 'Cumple · estable'; }
     }
+    for (const d of L) if (d.emo === '💀' && d.renovN !== 3) d.emo = '😢';
     const all = { venta: d3.sum(tk, (d) => d.venta), tickets: d3.sum(tk, (d) => d.es_ticket), vtk: d3.sum(tk.filter((d) => d.es_ticket), (d) => d.venta), und: d3.sum(tk.filter((d) => d.es_ticket), (d) => d.und), vs: d3.sum(tk, (d) => d.venta_sin), mg: d3.sum(tk, (d) => d.margen) };
     all.tp = all.tickets ? all.vtk / all.tickets : null; all.upt = all.tickets ? all.und / all.tickets : null; all.margen = all.vs ? all.mg / all.vs : null;
     all.max = d3.greatest(tk.filter((d) => d.es_ticket), (d) => d.venta);
